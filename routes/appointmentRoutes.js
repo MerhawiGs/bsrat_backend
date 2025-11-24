@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const database = require('../database/database.js');
 const Appointment = require('../models/appointment');
+const { checkAvailability } = require('../services/availabilityService');
 
 router.get('/', (req, res) => {
     res.json("Welcome to the Appointment Service!");
@@ -27,11 +28,22 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Appointment date and time are required' });
         }
 
+        // Check availability before creating appointment
+        const requestedDateTime = new Date(appointmentAt);
+        const availabilityCheck = await checkAvailability(requestedDateTime);
+        
+        if (!availabilityCheck.available) {
+            return res.status(400).json({ 
+                error: 'Time slot not available',
+                reason: availabilityCheck.reason 
+            });
+        }
+
         const appointment = new Appointment({
             fullName: fullName.trim(),
             email: email.trim().toLowerCase(),
             phone: phone.trim(),
-            appointmentAt: new Date(appointmentAt),
+            appointmentAt: requestedDateTime,
             serviceType: serviceType || 'consultation',
             notes: notes ? notes.trim() : '',
             location: location || 'office',
