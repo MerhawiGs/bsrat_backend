@@ -44,8 +44,25 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-// Explicitly handle preflight requests for all routes
-app.options('*', cors(corsOptions));
+
+// Explicitly handle preflight requests for all routes in a way that avoids
+// using path-to-regexp patterns that some environments reject (e.g. '*').
+app.use((req, res, next) => {
+  if (req.method !== 'OPTIONS') return next();
+
+  const origin = req.headers.origin;
+  // Allow requests with no origin (curl/mobile); otherwise check allowed list
+  if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(204);
+  }
+
+  // Not allowed
+  res.status(403).send('CORS origin denied');
+});
 app.use(express.json({ limit: '10mb' })); // Increase limit for base64 images
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
